@@ -14,6 +14,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ==========================================
+# 🔒 身份驗證與域名限制 (僅限 @cdsj.edu.mo)
+# ==========================================
+ALLOWED_DOMAIN = "@cdsj.edu.mo"
+
+# 檢查使用者是否已登入
+if not st.experimental_user.is_logged_in:
+    st.markdown('<div class="main-header">🎒 學生書包秤重 Web 登記系統</div>', unsafe_allow_html=True)
+    st.warning("🔒 本系統僅供校內教職員使用，請先使用學校 Google 帳號登入。")
+    if st.button("🔑 使用學校 Google 帳號登入", type="primary"):
+        st.login()
+    st.stop()  # 未登入則中斷後續程式碼執行
+
+# 檢查登入者的電郵域名是否符合 @cdsj.edu.mo
+user_email = st.experimental_user.email
+if not user_email.endswith(ALLOWED_DOMAIN):
+    st.error(f"❌ 存取拒絕：您的帳號 ({user_email}) 不屬於授權域名 `{ALLOWED_DOMAIN}`。")
+    st.info("請登出並切換至學校官方電郵帳號重試。")
+    if st.button("🚪 登出系統"):
+        st.logout()
+    st.stop()  # 域名不符則中斷執行
+
+# --- 登入成功後於側邊欄顯示使用者資訊 ---
+st.sidebar.write(f"👤 **目前登入者**：\n{user_email}")
+if st.sidebar.button("🚪 登出系統"):
+    st.logout()
+st.sidebar.markdown("---")
+
 # --- 常數與超重原因定義 ---
 OVERWEIGHT_REASONS = [
     "1) 書包材質偏重",
@@ -166,7 +194,6 @@ if user_mode == "📱 抽查老師登記端":
                 key=f"seat_{selected_class}_{i}"
             )
         
-        # 即時依據【班別 + 座號】檢索資料庫
         lookup_key = f"{selected_class}-{seat_no}"
         s_info = STUDENT_DB.get(lookup_key, {})
         s_name = s_info.get("name", "未找到姓名")
@@ -189,7 +216,6 @@ if user_mode == "📱 抽查老師登記端":
                 key=f"bag_{selected_class}_{i}"
             )
 
-        # 計算超重比例
         ratio = (bag_w / s_weight * 100) if (s_weight and bag_w > 0) else 0.0
         is_overweight = ratio > 15.0 if (s_weight and bag_w > 0) else False
 
@@ -221,7 +247,8 @@ if user_mode == "📱 抽查老師登記端":
             "ratio": round(ratio, 2) if ratio else 0.0,
             "status": "超重" if is_overweight else ("達標" if bag_w > 0 else "未輸入"),
             "reason": reason_val if is_overweight else "",
-            "note": note_val if is_overweight else ""
+            "note": note_val if is_overweight else "",
+            "submitted_by": user_email  # 紀錄提交老師的電郵
         })
         st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
@@ -236,6 +263,7 @@ if user_mode == "📱 抽查老師登記端":
         
         st.session_state.records[selected_class] = {
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_by": user_email,
             "students": form_data
         }
         save_records(st.session_state.records)
@@ -297,9 +325,10 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
                 st_list = [s for s in records[cls]["students"] if s["bag_weight"] > 0]
                 c_pass = sum(1 for s in st_list if s["status"] == "達標")
                 c_rate = (c_pass / len(st_list) * 100) if st_list else 0.0
-                class_progress.append({"班別": cls, "已填人數": len(st_list), "達標率(%)": round(c_rate, 1), "狀態": "✅ 已提交"})
+                updater = records[cls].get("updated_by", "未知")
+                class_progress.append({"班別": cls, "已填人數": len(st_list), "達標率(%)": round(c_rate, 1), "狀態": "✅ 已提交", "提交者": updater})
             else:
-                class_progress.append({"班別": cls, "已填人數": 0, "達標率(%)": 0.0, "狀態": "⏳ 未提交"})
+                class_progress.append({"班別": cls, "已填人數": 0, "達標率(%)": 0.0, "狀態": "⏳ 未提交", "提交者": "-"})
 
         df_progress = pd.DataFrame(class_progress)
         st.dataframe(df_progress, use_container_width=True, height=280)
@@ -351,7 +380,7 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
     with st.expander("🔍 檢視全校已提交之詳細學生明細數據"):
         if all_students_flat:
             df_all = pd.DataFrame(all_students_flat)
-            st.dataframe(df_all[["class", "seat", "name", "body_weight", "bag_weight", "ratio", "status", "reason", "note"]], use_container_width=True)
+            st.dataframe(df_all[["class", "seat", "name", "body_weight", "bag_weight", "ratio", "status", "reason", "note", "submitted_by"]], use_container_width=True)
         else:
             st.info("尚無學生明細數據。")
 
@@ -379,10 +408,11 @@ else:
     ---
 
     ### 📱 網頁版操作流程
-    1. 切換至 **「📱 抽查老師登記端」**。
-    2. 下拉選取貴班班別（P1A ~ P6D）。
-    3. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
-    4. 輸入書包重量，系統自動判斷是否超重；若超重可選擇超重原因。
-    5. 完成後點擊 **「提交本班抽查紀錄」**。
-    6. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並匯出全校 Excel。
+    1. 使用學校 Google 帳號 (`@cdsj.edu.mo`) 登入系統。
+    2. 切換至 **「📱 抽查老師登記端」**。
+    3. 下拉選取貴班班別（P1A ~ P6D）。
+    4. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
+    5. 輸入書包重量，系統自動判斷是否超重；若超重可選擇超重原因。
+    6. 完成後點擊 **「提交本班抽查紀錄」**。
+    7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並匯出全校 Excel。
     """)
