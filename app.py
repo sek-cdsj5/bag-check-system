@@ -14,32 +14,82 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- 自訂 CSS 樣式 ---
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1E3A8A;
+        margin-bottom: 0.5rem;
+    }
+    .sub-header {
+        font-size: 1.0rem;
+        color: #4B5563;
+        margin-bottom: 1.5rem;
+    }
+    .card-pass {
+        background-color: #DEF7EC;
+        border-left: 5px solid #0E9F6E;
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+    }
+    .card-over {
+        background-color: #FDE8E8;
+        border-left: 5px solid #F05252;
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+    }
+    .login-box {
+        max-width: 500px;
+        margin: 50px auto;
+        padding: 30px;
+        background-color: #F9FAFB;
+        border-radius: 12px;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ==========================================
-# 🔒 身份驗證與域名限制 (僅限 @cdsj.edu.mo)
+# 🔒 校內電郵身份驗證 (限制 @cdsj5.edu.mo)
 # ==========================================
-ALLOWED_DOMAIN = "@cdsj.edu.mo"
+ALLOWED_DOMAIN = "@cdsj5.edu.mo"
 
-# 檢查使用者是否已登入
-if not st.experimental_user.is_logged_in:
-    st.markdown('<div class="main-header">🎒 學生書包秤重 Web 登記系統</div>', unsafe_allow_html=True)
-    st.warning("🔒 本系統僅供校內教職員使用，請先使用學校 Google 帳號登入。")
-    if st.button("🔑 使用學校 Google 帳號登入", type="primary"):
-        st.login()
-    st.stop()  # 未登入則中斷後續程式碼執行
+if "user_email" not in st.session_state:
+    st.session_state.user_email = ""
 
-# 檢查登入者的電郵域名是否符合 @cdsj.edu.mo
-user_email = st.experimental_user.email
-if not user_email.endswith(ALLOWED_DOMAIN):
-    st.error(f"❌ 存取拒絕：您的帳號 ({user_email}) 不屬於授權域名 `{ALLOWED_DOMAIN}`。")
-    st.info("請登出並切換至學校官方電郵帳號重試。")
-    if st.button("🚪 登出系統"):
-        st.logout()
-    st.stop()  # 域名不符則中斷執行
+# 未登入時顯示驗證登入框
+if not st.session_state.user_email:
+    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    st.markdown("## 🎒 學生書包秤重 Web 登記系統")
+    st.markdown("#### 🔒 教職員身份驗證")
+    st.info(f"本系統僅供校內教職員使用，請輸入貴校官方電郵 (`{ALLOWED_DOMAIN}`) 以進入系統。")
 
-# --- 登入成功後於側邊欄顯示使用者資訊 ---
-st.sidebar.write(f"👤 **目前登入者**：\n{user_email}")
+    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj.edu.mo")
+
+    if st.button("🔑 登入系統", type="primary", use_container_width=True):
+        clean_email = input_email.strip().lower()
+        if not clean_email:
+            st.warning("⚠️ 請輸入 Email 帳號！")
+        elif not clean_email.endswith(ALLOWED_DOMAIN):
+            st.error(f"❌ 登入失敗：電郵網域不正確！必須以 `{ALLOWED_DOMAIN}` 結尾。")
+        else:
+            st.session_state.user_email = clean_email
+            st.success("✅ 驗證成功，正在進入系統...")
+            st.rerun()
+            
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()  # 驗證未通過則中斷執行後續內容
+
+# --- 登入成功後於側邊欄顯示使用者資訊與登出按鈕 ---
+st.sidebar.write(f"👤 **目前登入者**：\n`{st.session_state.user_email}`")
 if st.sidebar.button("🚪 登出系統"):
-    st.logout()
+    st.session_state.user_email = ""
+    st.rerun()
 st.sidebar.markdown("---")
 
 # --- 常數與超重原因定義 ---
@@ -109,37 +159,6 @@ def save_records(records):
 if "records" not in st.session_state:
     st.session_state.records = load_records()
 
-# --- 自訂 CSS 樣式 ---
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #1E3A8A;
-        margin-bottom: 0.5rem;
-    }
-    .sub-header {
-        font-size: 1.0rem;
-        color: #4B5563;
-        margin-bottom: 1.5rem;
-    }
-    .card-pass {
-        background-color: #DEF7EC;
-        border-left: 5px solid #0E9F6E;
-        padding: 10px 15px;
-        border-radius: 6px;
-        margin-bottom: 10px;
-    }
-    .card-over {
-        background-color: #FDE8E8;
-        border-left: 5px solid #F05252;
-        padding: 10px 15px;
-        border-radius: 6px;
-        margin-bottom: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # --- 側邊欄導覽 ---
 st.sidebar.title("🎒 秤重登記系統")
 
@@ -166,7 +185,7 @@ if user_mode == "📱 抽查老師登記端":
 
     with col_status:
         if existing_class_data:
-            st.success(f"✅ {selected_class} 曾於 {existing_class_data.get('updated_at', '')} 提交過數據，再次提交將覆蓋更新。")
+            st.success(f"✅ {selected_class} 曾於 {existing_class_data.get('updated_at', '')} 由 {existing_class_data.get('updated_by', '')} 提交過數據，再次提交將覆蓋更新。")
         else:
             st.info(f"📌 {selected_class} 尚未提交數據。請完成 11 位同學秤重後提交。")
 
@@ -248,7 +267,7 @@ if user_mode == "📱 抽查老師登記端":
             "status": "超重" if is_overweight else ("達標" if bag_w > 0 else "未輸入"),
             "reason": reason_val if is_overweight else "",
             "note": note_val if is_overweight else "",
-            "submitted_by": user_email  # 紀錄提交老師的電郵
+            "submitted_by": st.session_state.user_email
         })
         st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
@@ -263,7 +282,7 @@ if user_mode == "📱 抽查老師登記端":
         
         st.session_state.records[selected_class] = {
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "updated_by": user_email,
+            "updated_by": st.session_state.user_email,
             "students": form_data
         }
         save_records(st.session_state.records)
@@ -408,7 +427,7 @@ else:
     ---
 
     ### 📱 網頁版操作流程
-    1. 使用學校 Google 帳號 (`@cdsj.edu.mo`) 登入系統。
+    1. 輸入學校官方電郵 (`@cdsj.edu.mo`) 完成身份驗證。
     2. 切換至 **「📱 抽查老師登記端」**。
     3. 下拉選取貴班班別（P1A ~ P6D）。
     4. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
