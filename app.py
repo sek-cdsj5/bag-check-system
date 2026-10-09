@@ -83,7 +83,7 @@ if not st.session_state.user_email:
             st.rerun()
             
     st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # 驗證未通過則中斷執行後續內容
+    st.stop()
 
 # --- 登入成功後於側邊欄顯示使用者資訊與登出按鈕 ---
 st.sidebar.write(f"👤 **目前登入者**：\n`{st.session_state.user_email}`")
@@ -200,7 +200,11 @@ if user_mode == "📱 抽查老師登記端":
 
         prev_row = existing_class_data.get("students", [])
         default_seat = prev_row[i-1]["seat"] if i <= len(prev_row) else i
-        default_bag = prev_row[i-1]["bag_weight"] if i <= len(prev_row) else 0.0
+        
+        # 讀取舊紀錄重量，若無則為 None (保持空白)
+        raw_prev_bag = prev_row[i-1]["bag_weight"] if i <= len(prev_row) else None
+        default_bag = float(raw_prev_bag) if raw_prev_bag and raw_prev_bag > 0 else None
+
         default_reason = prev_row[i-1]["reason"] if i <= len(prev_row) else OVERWEIGHT_REASONS[0]
         default_note = prev_row[i-1]["note"] if i <= len(prev_row) else ""
 
@@ -226,20 +230,25 @@ if user_mode == "📱 抽查老師登記端":
             st.text_input(f"體重 #{i}", value=weight_str, disabled=True, key=f"weight_{selected_class}_{seat_no}_{i}")
 
         with c4:
+            # 💡 關鍵設定：value 設為 default_bag (預設 None 即空白欄位)
             bag_w = st.number_input(
                 f"書包重量 (kg) #{i}", 
                 min_value=0.0, 
                 max_value=20.0, 
                 step=0.1, 
-                value=float(default_bag), 
+                value=default_bag, 
+                placeholder="例如：2.5",
                 key=f"bag_{selected_class}_{i}"
             )
 
-        ratio = (bag_w / s_weight * 100) if (s_weight and bag_w > 0) else 0.0
-        is_overweight = ratio > 15.0 if (s_weight and bag_w > 0) else False
+        # 處理重量數據 (確保 None 不會引起計算錯誤)
+        bag_weight_val = float(bag_w) if bag_w is not None else 0.0
+
+        ratio = (bag_weight_val / s_weight * 100) if (s_weight and bag_weight_val > 0) else 0.0
+        is_overweight = ratio > 15.0 if (s_weight and bag_weight_val > 0) else False
 
         with c5:
-            if bag_w > 0 and s_weight:
+            if bag_weight_val > 0 and s_weight:
                 if is_overweight:
                     st.markdown(f"<div class='card-over'>❌ <b>超重 {ratio:.1f}%</b> (>15%)</div>", unsafe_allow_html=True)
                 else:
@@ -262,9 +271,9 @@ if user_mode == "📱 抽查老師登記端":
             "seat": seat_no,
             "name": s_name,
             "body_weight": s_weight,
-            "bag_weight": bag_w,
+            "bag_weight": bag_weight_val,
             "ratio": round(ratio, 2) if ratio else 0.0,
-            "status": "超重" if is_overweight else ("達標" if bag_w > 0 else "未輸入"),
+            "status": "超重" if is_overweight else ("達標" if bag_weight_val > 0 else "未輸入"),
             "reason": reason_val if is_overweight else "",
             "note": note_val if is_overweight else "",
             "submitted_by": st.session_state.user_email
@@ -431,7 +440,7 @@ else:
     2. 切換至 **「📱 抽查老師登記端」**。
     3. 下拉選取貴班班別（P1A ~ P6D）。
     4. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
-    5. 輸入書包重量，系統自動判斷是否超重；若超重可選擇超重原因。
+    5. 輸入書包重量（預設空白，點擊即可直接輸入），系統自動判斷是否超重。
     6. 完成後點擊 **「提交本班抽查紀錄」**。
     7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並匯出全校 Excel。
     """)
