@@ -55,9 +55,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔒 校內電郵身份驗證 (限制 @cdsj5.edu.mo)
+# 🔒 校內電郵身份驗證 (限制 @cdsj.edu.mo)
 # ==========================================
-ALLOWED_DOMAIN = "@cdsj5.edu.mo"
+ALLOWED_DOMAIN = "@cdsj.edu.mo"
 
 if "user_email" not in st.session_state:
     st.session_state.user_email = ""
@@ -69,7 +69,7 @@ if not st.session_state.user_email:
     st.markdown("#### 🔒 教職員身份驗證")
     st.info(f"本系統僅供校內教職員使用，請輸入貴校官方電郵 (`{ALLOWED_DOMAIN}`) 以進入系統。")
 
-    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj5.edu.mo")
+    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj.edu.mo")
 
     if st.button("🔑 登入系統", type="primary", use_container_width=True):
         clean_email = input_email.strip().lower()
@@ -367,26 +367,31 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
             wb = openpyxl.load_workbook(XLSX_PATH)
         else:
             wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "📊 全校各班抽查總表"
 
-        if '📊 全校各班抽查總表' in wb.sheetnames:
-            ws = wb['📊 全校各班抽查總表']
-            curr_row = 4
-            for cls in CLASSES:
-                cdata = records.get(cls, {})
-                s_list = cdata.get("students", [])
-                for s in s_list:
-                    if s["bag_weight"] > 0:
-                        ws.cell(row=curr_row, column=1, value=cls)
-                        ws.cell(row=curr_row, column=2, value=s["seat"])
-                        ws.cell(row=curr_row, column=3, value=s["name"])
-                        ws.cell(row=curr_row, column=4, value=s["body_weight"])
-                        ws.cell(row=curr_row, column=5, value=s["bag_weight"])
-                        ws.cell(row=curr_row, column=6, value=s["ratio"] / 100.0 if s["ratio"] else "")
-                        ws.cell(row=curr_row, column=7, value=s["status"])
-                        ws.cell(row=curr_row, column=8, value=s["reason"])
-                        curr_row += 1
+        # 🛡️ 智慧尋找工作表，若無則自動取第一個分頁或建立
+        sheet_name = "📊 全校各班抽查總表"
+        if sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+        elif len(wb.sheetnames) > 0:
+            ws = wb.active
+        else:
+            ws = wb.create_sheet(title=sheet_name)
+
+        curr_row = 4
+        for cls in CLASSES:
+            cdata = records.get(cls, {})
+            s_list = cdata.get("students", [])
+            for s in s_list:
+                if s["bag_weight"] > 0:
+                    ws.cell(row=curr_row, column=1, value=cls)
+                    ws.cell(row=curr_row, column=2, value=s["seat"])
+                    ws.cell(row=curr_row, column=3, value=s["name"])
+                    ws.cell(row=curr_row, column=4, value=s["body_weight"])
+                    ws.cell(row=curr_row, column=5, value=s["bag_weight"])
+                    ws.cell(row=curr_row, column=6, value=s["ratio"] / 100.0 if s["ratio"] else "")
+                    ws.cell(row=curr_row, column=7, value=s["status"])
+                    ws.cell(row=curr_row, column=8, value=s["reason"])
+                    curr_row += 1
 
         out_path = "generated_export.xlsx"
         wb.save(out_path)
