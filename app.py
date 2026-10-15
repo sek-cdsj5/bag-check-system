@@ -55,9 +55,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔒 校內電郵身份驗證 (限制 @cdsj5.edu.mo)
+# 🔒 校內電郵身份驗證 (限制 @cdsj.edu.mo)
 # ==========================================
-ALLOWED_DOMAIN = "@cdsj5.edu.mo"
+ALLOWED_DOMAIN = "@cdsj.edu.mo"
 
 if "user_email" not in st.session_state:
     st.session_state.user_email = ""
@@ -69,7 +69,7 @@ if not st.session_state.user_email:
     st.markdown("#### 🔒 教職員身份驗證")
     st.info(f"本系統僅供校內教職員使用，請輸入貴校官方電郵 (`{ALLOWED_DOMAIN}`) 以進入系統。")
 
-    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj5.edu.mo")
+    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj.edu.mo")
 
     if st.button("🔑 登入系統", type="primary", use_container_width=True):
         clean_email = input_email.strip().lower()
@@ -201,7 +201,6 @@ if user_mode == "📱 抽查老師登記端":
         prev_row = existing_class_data.get("students", [])
         default_seat = prev_row[i-1]["seat"] if i <= len(prev_row) else i
         
-        # 讀取舊紀錄重量，若無則為 None (保持空白)
         raw_prev_bag = prev_row[i-1]["bag_weight"] if i <= len(prev_row) else None
         default_bag = float(raw_prev_bag) if raw_prev_bag and raw_prev_bag > 0 else None
 
@@ -230,7 +229,6 @@ if user_mode == "📱 抽查老師登記端":
             st.text_input(f"體重 #{i}", value=weight_str, disabled=True, key=f"weight_{selected_class}_{seat_no}_{i}")
 
         with c4:
-            # 💡 關鍵設定：value 設為 default_bag (預設 None 即空白欄位)
             bag_w = st.number_input(
                 f"書包重量 (kg) #{i}", 
                 min_value=0.0, 
@@ -241,7 +239,6 @@ if user_mode == "📱 抽查老師登記端":
                 key=f"bag_{selected_class}_{i}"
             )
 
-        # 處理重量數據 (確保 None 不會引起計算錯誤)
         bag_weight_val = float(bag_w) if bag_w is not None else 0.0
 
         ratio = (bag_weight_val / s_weight * 100) if (s_weight and bag_weight_val > 0) else 0.0
@@ -366,12 +363,12 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
     st.subheader("📥 匯出全校彙整 Excel 報告")
     
     def generate_excel_bytes():
-    if os.path.exists(XLSX_PATH):
-        wb = openpyxl.load_workbook(XLSX_PATH)
-    else:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "📊 全校各班抽查總表"
+        if os.path.exists(XLSX_PATH):
+            wb = openpyxl.load_workbook(XLSX_PATH)
+        else:
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "📊 全校各班抽查總表"
 
         if '📊 全校各班抽查總表' in wb.sheetnames:
             ws = wb['📊 全校各班抽查總表']
