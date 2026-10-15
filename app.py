@@ -368,9 +368,13 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
             wb = openpyxl.load_workbook(DSEDJ_TEMPLATE_PATH)
         else:
             wb = openpyxl.Workbook()
-            # 建立必要的工作表
             wb.active.title = "學生書包重量抽查結果紀錄表"
             wb.create_sheet(title="學生書包重量抽查結果分析表")
+
+        grade_mapping = {
+            "P1": "小一", "P2": "小二", "P3": "小三",
+            "P4": "小四", "P5": "小五", "P6": "小六"
+        }
 
         # 1. 填寫「學生書包重量抽查結果紀錄表」
         if "學生書包重量抽查結果紀錄表" in wb.sheetnames:
@@ -378,21 +382,22 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
             start_row = 7
             row_idx = 0
             
-            # 依照所有已提交的學生數據填入
             for cls in CLASSES:
+                prefix = cls[:2]
+                grade_name = grade_mapping.get(prefix, cls)
+
                 cdata = records.get(cls, {})
                 s_list = cdata.get("students", [])
                 for s in s_list:
                     if s["bag_weight"] > 0:
                         curr_row = start_row + row_idx
                         ws_rec.cell(row=curr_row, column=1, value=row_idx + 1) # 序號
-                        ws_rec.cell(row=curr_row, column=2, value=cls) # 年級/班別
+                        ws_rec.cell(row=curr_row, column=2, value=grade_name) # 年級
                         ws_rec.cell(row=curr_row, column=3, value=s["body_weight"]) # 學生體重
                         ws_rec.cell(row=curr_row, column=4, value=s["bag_weight"]) # 書包重量
                         ws_rec.cell(row=curr_row, column=5, value=s["ratio"] / 100.0 if s["ratio"] else 0) # 占比
                         ws_rec.cell(row=curr_row, column=6, value="ü" if s["status"] == "達標" else "û") # 是否達標
                         
-                        # 超重原因對應代號 (1至6)
                         reason_text = s.get("reason", "")
                         reason_code = reason_text.split(")")[0] if ")" in reason_text else ""
                         ws_rec.cell(row=curr_row, column=7, value=reason_code)
