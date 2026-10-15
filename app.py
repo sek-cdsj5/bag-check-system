@@ -112,7 +112,7 @@ CLASSES = [
 ]
 
 DB_FILE = "survey_records.json"
-XLSX_PATH = "學生書包秤重登記表_26-27學年_v3.xlsx"
+XLSX_PATH = "學生書包秤重登記表_26-27學年_v5.xlsx"
 
 # --- 載入學生體重資料庫 ---
 @st.cache_data
@@ -366,12 +366,12 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
     st.subheader("📥 匯出全校彙整 Excel 報告")
     
     def generate_excel_bytes():
-        if os.path.exists(XLSX_PATH):
-            wb = openpyxl.load_workbook(XLSX_PATH)
-        else:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "📊 全校各班抽查總表"
+    if os.path.exists(XLSX_PATH):
+        wb = openpyxl.load_workbook(XLSX_PATH)
+    else:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "📊 全校各班抽查總表"
 
         if '📊 全校各班抽查總表' in wb.sheetnames:
             ws = wb['📊 全校各班抽查總表']
