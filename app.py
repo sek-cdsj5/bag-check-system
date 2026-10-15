@@ -55,9 +55,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔒 校內電郵身份驗證 (限制 @cdsj.edu.mo)
+# 🔒 校內電郵身份驗證 (限制 @cdsj5.edu.mo)
 # ==========================================
-ALLOWED_DOMAIN = "@cdsj.edu.mo"
+ALLOWED_DOMAIN = "@cdsj5.edu.mo"
 
 if "user_email" not in st.session_state:
     st.session_state.user_email = ""
@@ -69,7 +69,7 @@ if not st.session_state.user_email:
     st.markdown("#### 🔒 教職員身份驗證")
     st.info(f"本系統僅供校內教職員使用，請輸入貴校官方電郵 (`{ALLOWED_DOMAIN}`) 以進入系統。")
 
-    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj.edu.mo")
+    input_email = st.text_input("請輸入學校 Email 帳號：", placeholder="username@cdsj5.edu.mo")
 
     if st.button("🔑 登入系統", type="primary", use_container_width=True):
         clean_email = input_email.strip().lower()
@@ -113,6 +113,7 @@ CLASSES = [
 
 DB_FILE = "survey_records.json"
 XLSX_PATH = "學生書包秤重登記表_26-27學年_v5.xlsx"
+DSEDJ_TEMPLATE_PATH = "學生書包重量抽查結果紀錄表及分析表.xlsx"
 
 # --- 載入學生體重資料庫 ---
 @st.cache_data
@@ -300,7 +301,7 @@ if user_mode == "📱 抽查老師登記端":
 # ==========================================
 elif user_mode == "🖥️ 教務處/管理員儀表板":
     st.markdown('<div class="main-header">🖥️ 全校學生書包秤重 — 管理員儀表板</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">即時監控全校 20 班抽查進度、分析超重原因，並可一鍵產出標準 Excel 匯出檔。</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">即時監控全校 20 班抽查進度、分析超重原因，並可一鍵產出教青局官方標準格式總報告。</div>', unsafe_allow_html=True)
 
     records = st.session_state.records
 
@@ -360,49 +361,62 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
 
     st.markdown("---")
 
-    st.subheader("📥 匯出全校彙整 Excel 報告")
+    st.subheader("📥 匯出教青局官方標準格式報告")
     
-    def generate_excel_bytes():
-        if os.path.exists(XLSX_PATH):
-            wb = openpyxl.load_workbook(XLSX_PATH)
+    def generate_dsedj_report_bytes():
+        if os.path.exists(DSEDJ_TEMPLATE_PATH):
+            wb = openpyxl.load_workbook(DSEDJ_TEMPLATE_PATH)
         else:
             wb = openpyxl.Workbook()
+            # 建立必要的工作表
+            wb.active.title = "學生書包重量抽查結果紀錄表"
+            wb.create_sheet(title="學生書包重量抽查結果分析表")
 
-        # 🛡️ 智慧尋找工作表，若無則自動取第一個分頁或建立
-        sheet_name = "📊 全校各班抽查總表"
-        if sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
-        elif len(wb.sheetnames) > 0:
-            ws = wb.active
-        else:
-            ws = wb.create_sheet(title=sheet_name)
+        # 1. 填寫「學生書包重量抽查結果紀錄表」
+        if "學生書包重量抽查結果紀錄表" in wb.sheetnames:
+            ws_rec = wb["學生書包重量抽查結果紀錄表"]
+            start_row = 7
+            row_idx = 0
+            
+            # 依照所有已提交的學生數據填入
+            for cls in CLASSES:
+                cdata = records.get(cls, {})
+                s_list = cdata.get("students", [])
+                for s in s_list:
+                    if s["bag_weight"] > 0:
+                        curr_row = start_row + row_idx
+                        ws_rec.cell(row=curr_row, column=1, value=row_idx + 1) # 序號
+                        ws_rec.cell(row=curr_row, column=2, value=cls) # 年級/班別
+                        ws_rec.cell(row=curr_row, column=3, value=s["body_weight"]) # 學生體重
+                        ws_rec.cell(row=curr_row, column=4, value=s["bag_weight"]) # 書包重量
+                        ws_rec.cell(row=curr_row, column=5, value=s["ratio"] / 100.0 if s["ratio"] else 0) # 占比
+                        ws_rec.cell(row=curr_row, column=6, value="ü" if s["status"] == "達標" else "û") # 是否達標
+                        
+                        # 超重原因對應代號 (1至6)
+                        reason_text = s.get("reason", "")
+                        reason_code = reason_text.split(")")[0] if ")" in reason_text else ""
+                        ws_rec.cell(row=curr_row, column=7, value=reason_code)
+                        
+                        row_idx += 1
 
-        curr_row = 4
-        for cls in CLASSES:
-            cdata = records.get(cls, {})
-            s_list = cdata.get("students", [])
-            for s in s_list:
-                if s["bag_weight"] > 0:
-                    ws.cell(row=curr_row, column=1, value=cls)
-                    ws.cell(row=curr_row, column=2, value=s["seat"])
-                    ws.cell(row=curr_row, column=3, value=s["name"])
-                    ws.cell(row=curr_row, column=4, value=s["body_weight"])
-                    ws.cell(row=curr_row, column=5, value=s["bag_weight"])
-                    ws.cell(row=curr_row, column=6, value=s["ratio"] / 100.0 if s["ratio"] else "")
-                    ws.cell(row=curr_row, column=7, value=s["status"])
-                    ws.cell(row=curr_row, column=8, value=s["reason"])
-                    curr_row += 1
+        # 2. 填寫「學生書包重量抽查結果分析表」
+        if "學生書包重量抽查結果分析表" in wb.sheetnames:
+            ws_ana = wb["學生書包重量抽查結果分析表"]
+            ws_ana.cell(row=4, column=5, value=len(STUDENT_DB)) # 抽查教育階段總人數
+            ws_ana.cell(row=5, column=3, value=total_surveyed) # 抽查學生人數
+            ws_ana.cell(row=6, column=3, value=total_over) # 書包超重人數
+            ws_ana.cell(row=7, column=3, value=total_pass) # 書包達標人數
 
-        out_path = "generated_export.xlsx"
+        out_path = "dsedj_report_export.xlsx"
         wb.save(out_path)
         with open(out_path, "rb") as f:
             return f.read()
 
-    excel_data = generate_excel_bytes()
+    dsedj_excel_bytes = generate_dsedj_report_bytes()
     st.download_button(
-        label="📄 下載全校抽查總表 Excel (.xlsx)",
-        data=excel_data,
-        file_name=f"26-27學年_學生書包秤重全校彙整總表_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        label="📄 下載教青局官方標準格式總報告 (.xlsx)",
+        data=dsedj_excel_bytes,
+        file_name=f"教青局學生書包重量抽查結果紀錄及分析表_{datetime.now().strftime('%Y%m%d')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         type="primary"
     )
@@ -438,11 +452,11 @@ else:
     ---
 
     ### 📱 網頁版操作流程
-    1. 輸入學校官方電郵 (`@cdsj.edu.mo`) 完成身份驗證。
+    1. 輸入學校官方電郵 (`@cdsj5.edu.mo`) 完成身份驗證。
     2. 切換至 **「📱 抽查老師登記端」**。
     3. 下拉選取貴班班別（P1A ~ P6D）。
     4. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
     5. 輸入書包重量（預設空白，點擊即可直接輸入），系統自動判斷是否超重。
     6. 完成後點擊 **「提交本班抽查紀錄」**。
-    7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並匯出全校 Excel。
+    7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並**一鍵下載教青局官方標準格式報告**。
     """)
