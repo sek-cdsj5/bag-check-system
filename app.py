@@ -376,7 +376,6 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
             "P4": "小四", "P5": "小五", "P6": "小六"
         }
 
-        # 1. 填寫「學生書包重量抽查結果紀錄表」
         if "學生書包重量抽查結果紀錄表" in wb.sheetnames:
             ws_rec = wb["學生書包重量抽查結果紀錄表"]
             start_row = 7
@@ -391,12 +390,12 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
                 for s in s_list:
                     if s["bag_weight"] > 0:
                         curr_row = start_row + row_idx
-                        ws_rec.cell(row=curr_row, column=1, value=row_idx + 1) # 序號
-                        ws_rec.cell(row=curr_row, column=2, value=grade_name) # 年級
-                        ws_rec.cell(row=curr_row, column=3, value=s["body_weight"]) # 學生體重
-                        ws_rec.cell(row=curr_row, column=4, value=s["bag_weight"]) # 書包重量
-                        ws_rec.cell(row=curr_row, column=5, value=s["ratio"] / 100.0 if s["ratio"] else 0) # 占比
-                        ws_rec.cell(row=curr_row, column=6, value="ü" if s["status"] == "達標" else "û") # 是否達標
+                        ws_rec.cell(row=curr_row, column=1, value=row_idx + 1)
+                        ws_rec.cell(row=curr_row, column=2, value=grade_name)
+                        ws_rec.cell(row=curr_row, column=3, value=s["body_weight"])
+                        ws_rec.cell(row=curr_row, column=4, value=s["bag_weight"])
+                        ws_rec.cell(row=curr_row, column=5, value=s["ratio"] / 100.0 if s["ratio"] else 0)
+                        ws_rec.cell(row=curr_row, column=6, value="ü" if s["status"] == "達標" else "û")
                         
                         reason_text = s.get("reason", "")
                         reason_code = reason_text.split(")")[0] if ")" in reason_text else ""
@@ -404,13 +403,12 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
                         
                         row_idx += 1
 
-        # 2. 填寫「學生書包重量抽查結果分析表」
         if "學生書包重量抽查結果分析表" in wb.sheetnames:
             ws_ana = wb["學生書包重量抽查結果分析表"]
-            ws_ana.cell(row=4, column=5, value=len(STUDENT_DB)) # 抽查教育階段總人數
-            ws_ana.cell(row=5, column=3, value=total_surveyed) # 抽查學生人數
-            ws_ana.cell(row=6, column=3, value=total_over) # 書包超重人數
-            ws_ana.cell(row=7, column=3, value=total_pass) # 書包達標人數
+            ws_ana.cell(row=4, column=5, value=len(STUDENT_DB))
+            ws_ana.cell(row=5, column=3, value=total_surveyed)
+            ws_ana.cell(row=6, column=3, value=total_over)
+            ws_ana.cell(row=7, column=3, value=total_pass)
 
         out_path = "dsedj_report_export.xlsx"
         wb.save(out_path)
@@ -432,6 +430,27 @@ elif user_mode == "🖥️ 教務處/管理員儀表板":
             st.dataframe(df_all[["class", "seat", "name", "body_weight", "bag_weight", "ratio", "status", "reason", "note", "submitted_by"]], use_container_width=True)
         else:
             st.info("尚無學生明細數據。")
+
+    # ==========================================
+    # 🗑️ 管理員資料清理專區
+    # ==========================================
+    st.markdown("---")
+    st.subheader("⚙️ 系統資料管理與清除")
+    with st.expander("⚠️ 危險操作區：清除已登記的資料"):
+        st.warning("注意：此操作將會清空所有已提交的班級抽查紀錄（`survey_records.json`），且無法復原！請在匯出備份好報告後才進行此操作。")
+        confirm_delete = st.checkbox("我確定要清除全校所有已登記的抽查資料")
+        if st.button("🗑️ 立即清空所有登記資料", type="secondary"):
+            if confirm_delete:
+                st.session_state.records = {}
+                if os.path.exists(DB_FILE):
+                    try:
+                        os.remove(DB_FILE)
+                    except Exception:
+                        pass
+                st.success("✅ 已成功清空所有已登記的抽查資料！")
+                st.rerun()
+            else:
+                st.error("❌ 請先勾選「我確定要清除全校所有已登記的抽查資料」才能執行清除。")
 
 # ==========================================
 # 模式 3: ℹ️ 系統說明與超重標準
@@ -463,5 +482,5 @@ else:
     4. 輸入抽取的 11 位同學座號，系統自動帶出姓名與體重。
     5. 輸入書包重量（預設空白，點擊即可直接輸入），系統自動判斷是否超重。
     6. 完成後點擊 **「提交本班抽查紀錄」**。
-    7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計並**一鍵下載教青局官方標準格式報告**。
+    7. 教務處可在 **「🖥️ 教務處/管理員儀表板」** 查看統計、**一鍵下載教青局官方標準格式報告**，或進行資料重置清除。
     """)
